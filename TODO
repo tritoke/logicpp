@@ -1,0 +1,16 @@
+1. Add a replace function to replace all instances of an atom with another atom.
+   - used in splitting algorithm
+   - implement both an in-place and non in-place call.
+2. Implement syntatic simplification.
+3. Implement splitting algorithm
+4. Implement index operator for getting sub formulas
+5. Implement polarity checking for a subformula
+6. Implement is_pure(atom) - maybe one that walks the whole tree and gathers the purity of all atoms.
+7. Pure Atom simplification.
+
+Maybes:
+- Attempt to replace recursive algorithms with stack based ones.
+- Introduce a new position struct with a constructor from string e.g., Position pi("1.2.1");
+
+Reminders:
+- no need for to_string, can just yeet it into a stringstream 👌

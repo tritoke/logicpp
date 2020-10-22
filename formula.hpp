@@ -1,25 +1,20 @@
-#include <algorithm>
-#include <bitset>
+#pragma once
+
 #include <memory>
 #include <optional>
-#include <cassert>
-#include <cstdint>
-#include <functional>
-#include <iterator>
-#include <sstream>
-#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace logic {
-	/* anonymouse namespace to hide Atom struct */
+	/* anonymous namespace to hide Atom struct */
 	namespace {
 		/* atom struct - an atomic formulae
 		 * this is either Top / Bottom or a variable */
 		struct Atom {
 			/* if the atom is a variable it has a name */
 			std::string name;
-			/* one-hot encoding of the atom type */
+			/* indicates what type of atom this is */
 			enum AtomType {
 				variable,
 				tautology,
@@ -46,7 +41,7 @@ namespace logic {
 			conjunction,
 			disjunction,
 			implication,
-			equivalence
+			biimplication,
 		};
 	}
 
@@ -55,99 +50,26 @@ namespace logic {
 
 	/* a wrapper around std::unordered map */
 	class Interpretation {
-		/* mapping from atom.name to interpretation */
+		/* mapping from atom.name to its valuation */
 		std::unordered_map<std::string, bool> mapping;
 
 	public:
 		/* default constructor */
 		Interpretation() = default;
 
-		Interpretation(std::vector<std::pair<std::string, bool>> valuation) {
-			/* initialize the interpretation from a list of pairs - name to valuation */
-			std::copy(
-				valuation.begin(), valuation.end(),
-				std::inserter(mapping, mapping.end())
-			);
-		}
-
-		uint64_t count_satisfied() const {
-			uint64_t count = 0;
-			for (const auto & [name, value]: mapping) {
-				if (value) count++;
-			}
-
-			return count;
-		}
+		Interpretation(std::vector<std::pair<std::string, bool>>);
 
 		/* operator[] overloads */
-		bool& operator[](std::string& name) {
-			return mapping[name];
-		}
-
-		bool& operator[](const std::string& name) {
-			return mapping[name];
-		}
-
-		bool& operator[](Atom& atom) {
-			if (atom.type != AtomType::variable)
-					throw std::runtime_error("Mutable references can only be taken for propositional variables.");
-
-			return mapping[atom.name];
-		}
-
-		bool& operator[](const Atom& atom) {
-			if (atom.type != AtomType::variable)
-					throw std::runtime_error("Mutable references can only be taken for propositional variables.");
-
-			return mapping[atom.name];
-		}
+		bool& operator[](const std::string&);
+		bool& operator[](const Atom&);
 
 		/* .at overloads */
-		bool at(std::string& name) const {
-			return mapping.at(name);
-		}
+		bool at(const std::string&) const;
+		bool at(const Atom&) const;
 
-		bool at(const std::string& name) const {
-			return mapping.at(name);
-		}
+		friend std::ostream& operator<<(std::ostream&, const Interpretation&);
 
-		bool at(Atom& atom) const {
-			switch (atom.type) {
-				case AtomType::variable:
-					return mapping.at(atom.name);
-				case AtomType::tautology:
-					return true;
-				case AtomType::contradiction:
-					return false;
-			}
-		}
-
-		bool at(const Atom& atom) const {
-			switch (atom.type) {
-				case AtomType::variable:
-					return mapping.at(atom.name);
-				case AtomType::tautology:
-					return true;
-				case AtomType::contradiction:
-					return false;
-			}
-		}
-
-		friend std::ostream& operator<<(std::ostream& os, const Interpretation& interp) {
-			os << '[';
-			bool first_elem = true;
-			for (const auto& [name, value]: interp.mapping) {
-				if (!first_elem) {
-					os << ", ";
-				} else {
-					first_elem = false;
-				}
-
-				os << name << " ↦ " << value;
-			}
-			os << ']';
-			return os;
-		}
+		std::size_t count_satisfied() const;
 	};
 
 	/*
@@ -185,295 +107,75 @@ namespace logic {
 		std::optional<Connective> connective;
 		std::shared_ptr<const Formula> rsf;
 
-		Formula(const Formula& _lsf, Connective _connective, const Formula& _rsf)
-			: lsf(new Formula(_lsf)), connective(_connective), rsf(new Formula(_rsf)) { }
+		/* a set of all variables used - constructed as the tree gets built */
+		std::vector<std::string> variables;
 
-		/* constructor for negation */
-		Formula(Connective _connective, const Formula& _rsf)
-			: connective(_connective), rsf(new Formula(_rsf)) { }
-
-		/* atom constructor */
-		Formula(Atom _atom) : atom(_atom) { }
+		Formula(const Formula&, Connective, const Formula&); /* normal left side connective right side constructor */
+		Formula(Connective, const Formula&); /* constructor for negation */
+		Formula(Atom); /* atom constructor */
 
 	public:
-		/* atomic variable constructors */
-		Formula(const char * name) : atom(Atom(name, AtomType::variable)) { }
+		/* atomic variable constructor */
+		Formula(const char*);
 
-		static Formula PropVar(const char * name) {
-			return Formula(Atom(name, AtomType::variable));
-		}
+		/* propositional variable constructors */
+		static Formula PropVar(const char*);
+		static Formula Tautology();
+		static Formula Contradiction();
 
-		static Formula Tautology() {
-			return Formula(Atom("", AtomType::tautology));
-		}
+		/* Parse a formula from a string expression */
+		/* static Formula Parse(std::string&); */
 
-		static Formula Contradiction() {
-			return Formula(Atom("", AtomType::contradiction));
-		}
+		/* operator backing functions */
+		Formula negation() const;
+		Formula conjunction(const Formula&) const;
+		Formula disjunction(const Formula& rsf) const;
+		Formula implication(const Formula& rsf) const;
+		Formula biimplication(const Formula& rsf) const;
 
-		/* negation */
-		Formula negation() const {
-			return Formula(Connective::negation, *this);
-		}
+		/* convenient aliases */
+		Formula implies(const Formula& rsf) const;
+		Formula equals(const Formula& rsf) const;
 
-		friend Formula operator!(const Formula& formula) {
-			return formula.negation();
-		}
+		/* Formula construction operator overloads */
+		friend Formula operator!(const Formula&);
+		friend Formula operator&&(const Formula&, const Formula&);
+		friend Formula operator||(const Formula&, const Formula&);
+		friend Formula operator>>(const Formula&, const Formula&);
+		friend Formula operator==(const Formula&, const Formula&);
 
-		/* conjunction */
-		Formula conjunction(const Formula& rsf) const {
-			return Formula(*this, Connective::conjunction, rsf);
-		}
+		/* composite construction operators */
+		friend Formula operator^(const Formula&, const Formula&);
+		friend Formula operator!=(const Formula&, const Formula&);
 
-		friend Formula operator&&(const Formula& lsf, const Formula& rsf) {
-			return Formula(lsf, Connective::conjunction, rsf);
-		}
-
-		/* disjunction */
-		Formula disjunction(const Formula& rsf) const {
-			return Formula(*this, Connective::disjunction, rsf);
-		}
-
-		friend Formula operator||(const Formula& lsf, const Formula& rsf) {
-			return lsf.disjunction(rsf);
-		}
-
-		/* exclusive disjunction */
-		Formula exclusive_disjunction(const Formula& rsf) const {
-			/* this is much simpler to define using operators*/
-			return *this ^ rsf;
-		}
-
-		friend Formula operator^(const Formula& lsf, const Formula& rsf) {
-			return (lsf and not rsf) or (rsf and not lsf);
-		}
-
-		/* implication */
-		Formula implies(const Formula& rsf) const {
-			return Formula(*this, Connective::implication, rsf);
-		}
-
-		friend Formula operator>>(const Formula& lsf, const Formula& rsf) {
-			return lsf.implies(rsf);
-		}
-
-		/* equivalence */
-		Formula equals(const Formula& rsf) const {
-			return Formula(*this, Connective::equivalence, rsf);
-		}
-
-		friend Formula operator==(const Formula& lsf, const Formula& rsf) {
-			return lsf.equals(rsf);
-		}
+		/* other functions returning a new formula */
+		Formula replace(const std::string& varname, const Formula& replacement) const;
 
 		/* stream output operator */
-		friend std::ostream& operator<<(std::ostream& os, const Formula& formula) {
-			if (formula.atom.has_value()) {
-				/* formula is an atom - output it as a string */
-				os << formula.atom->to_string();
-			} else {
-				/* 
-				 * formula is a sub-expression
-				 * recursively construct it's representation
-				 */
+		friend std::ostream& operator<<(std::ostream&, const Formula&);
 
-				switch (*formula.connective) {
-					case Connective::negation:
-						os << "¬" << *formula.rsf;
-						break;
-					case Connective::conjunction:
-						os << "(" << *formula.lsf << "∧" << *formula.rsf << ")";
-						break;
-					case Connective::disjunction:
-						os << "(" << *formula.lsf << "∨" << *formula.rsf << ")";
-						break;
-					case Connective::implication:
-						os << "(" << *formula.lsf << "→" << *formula.rsf << ")";
-						break;
-					case Connective::equivalence:
-						os << "(" << *formula.lsf << "↔" << *formula.rsf << ")";
-						break;
-				}
-			}
-			return os;
-		}
+		/* ASCII string output */
+		std::string to_ascii_string() const;
 
-		bool eval(const Interpretation& I) const {
-			if (atom.has_value()) {
-				/* atomic variable */
-				return I.at(*atom);
-			} else {
-				/* perform connective logic operations */
-				switch (*connective) {
-					case Connective::negation:
-						return not rsf->eval(I);
-					case Connective::conjunction:
-						return lsf->eval(I) and rsf->eval(I);
-					case Connective::disjunction:
-						return lsf->eval(I) or rsf->eval(I);
-					case Connective::implication:
-						return (not lsf->eval(I)) or rsf->eval(I);
-					case Connective::equivalence:
-						return lsf->eval(I) == rsf->eval(I);
-				}
-			}
-		}
+		/* evaluate the formula under a given interpretaton */
+		bool eval(const Interpretation&) const;
 
-	private:
-		void traverse_variables(std::unordered_set<std::string>& names) const {
-			if (atom.has_value()) {
-				/* atomic variable */
-				if (atom->type == AtomType::variable)
-					names.insert(atom->name);
+		/* product a truth table for the formula */
+		std::string tabulate() const;
 
-			} else {
-				/* perform connective logic operations */
-				switch (*connective) {
-					case Connective::negation:
-						rsf->traverse_variables(names);
-						break;
-					default:
-						rsf->traverse_variables(names);
-						lsf->traverse_variables(names);
-				}
-			}
-		}
+		/* use a naive method to attempt to produce a satisfying interpretation */
+		std::optional<Interpretation> satisfy_naive() const;
+		
+		/* functions constructed using satisfy_naive */
+		bool satisfiable_naive() const;
+		bool unsatisfiable_naive() const;
+		bool is_tautology_naive() const;
+		bool semantically_equivalent_naive(const Formula& formula) const;
 
+		/* counts the number of satisfying interpretations */
+		std::size_t count_satisfying() const;
 
-	public:
-		/* traverse the formula to get the variables used */
-		std::unordered_set<std::string> variables() const {
-			std::unordered_set<std::string> names;
-
-			traverse_variables(names);
-
-			return names;
-		}
-
-		std::string tabulate() const {
-			const auto varnames = variables();
-			std::vector<std::string> variables;
-
-			if (varnames.size() > 64) {
-				throw std::out_of_range("Formula contains too many variables to tabulate.");
-			}
-
-			/* copy the names out of the set */
-			std::copy(
-				varnames.begin(), varnames.end(),
-				std::back_inserter(variables)
-			);
-
-			Interpretation I;
-			std::stringstream repr;
-
-			for (uint64_t i = 0; i < 1 << variables.size(); i++) {
-				std::bitset<64> valuations(i);
-				size_t index = 0;
-				for (const auto & variable : variables) {
-					I[variable] = valuations[index++];
-				}
-
-				repr << I << ": " << eval(I) << "\n";
-			}
-
-			return repr.str();
-		}
-
-		bool is_tautology() const {
-			/* test whether the formula is a tautology  */
-			const auto varnames = variables();
-			std::vector<std::string> variables;
-
-			if (varnames.size() > 64) {
-				throw std::out_of_range("Formula contains too many variables to test like this.");
-			}
-
-			/* copy the names out of the set */
-			std::copy(
-				varnames.begin(), varnames.end(),
-				std::back_inserter(variables)
-			);
-
-			Interpretation I;
-			for (uint64_t i = 0; i < 1 << variables.size(); i++) {
-				std::bitset<64> valuations(i);
-				size_t index = 0;
-				for (const auto & variable : variables) {
-					I[variable] = valuations[index++];
-				}
-
-				/* this interpretation results in a false statement therefore not a tautology */
-				if (not eval(I)) return false;
-			}
-
-			return true;
-		}
-
-		bool semantically_equivalent(const Formula& formula) const {
-			auto equivalence_formula = *this == formula;
-
-			return equivalence_formula.is_tautology();
-		}
-
-		uint64_t count_satisfying() const {
-			/* test whether the formula is a tautology  */
-			const auto varnames = variables();
-			std::vector<std::string> variables;
-		  uint64_t count = 0;
-
-			if (varnames.size() > 64) {
-				throw std::out_of_range("Formula contains too many variables to test like this.");
-			}
-
-			/* copy the names out of the set */
-			std::copy(
-				varnames.begin(), varnames.end(),
-				std::back_inserter(variables)
-			);
-
-			Interpretation I;
-			for (uint64_t i = 0; i < 1 << variables.size(); i++) {
-				std::bitset<64> valuations(i);
-				size_t index = 0;
-				for (const auto & variable : variables) {
-					I[variable] = valuations[index++];
-				}
-
-				if (eval(I)) count++;
-			}
-
-			return count;
-		}
-
-		bool is_parity_check() {
-			/* test whether the formula is a tautology  */
-			const auto varnames = variables();
-			std::vector<std::string> variables;
-
-			if (varnames.size() > 64) {
-				throw std::out_of_range("Formula contains too many variables to test like this.");
-			}
-
-			/* copy the names out of the set */
-			std::copy(
-				varnames.begin(), varnames.end(),
-				std::back_inserter(variables)
-			);
-
-			Interpretation I;
-			for (uint64_t i = 0; i < 1 << variables.size(); i++) {
-				std::bitset<64> valuations(i);
-				size_t index = 0;
-				for (const auto & variable : variables) {
-					I[variable] = valuations[index++];
-				}
-
-				if (eval(I) && I.count_satisfied() % 2 != 0) return false;
-			}
-
-			return true;
-		}
+		/* evaluates whether the formula is a parity check formula */
+		bool is_parity_check() const;
 	};
 }
-
