@@ -10,6 +10,9 @@ worksheets/worksheet*
 # don't commit exam material
 worksheets/exam*
 
+# don't commit gbd history
+.gdb_history
+
 # various makefile generated images
 out.*
 
