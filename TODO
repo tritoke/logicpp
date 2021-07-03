@@ -12,5 +12,8 @@ Maybes:
 - Attempt to replace recursive algorithms with stack based ones.
 - Introduce a new position struct with a constructor from string e.g., Position pi("1.2.1");
 
+Structural Changes:
+- for associative operators || and && make the formula keep a set of all Formulas instead of a large tree of formulas.
+
 Reminders:
 - no need for to_string, can just yeet it into a stringstream 👌

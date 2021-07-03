@@ -2,7 +2,7 @@
 Session.vim
 
 # worksheets
-worksheets/worksheet_*
+worksheets/
 
 # various makefile generated images
 out.*

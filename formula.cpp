@@ -201,8 +201,8 @@ namespace logic {
 		/* use stringstream to get the unicode representation */
 		unicode_repr << *this;
 
-    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
-    intermediate_wide_repr << conv.from_bytes(unicode_repr.str());
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+		intermediate_wide_repr << conv.from_bytes(unicode_repr.str());
 
 		wchar_t c;
 		while (intermediate_wide_repr >> c) {
