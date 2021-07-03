@@ -2,7 +2,13 @@
 Session.vim
 
 # worksheets
-worksheets/
+worksheets/worksheet*
+
+# commit worksheet code
+!worksheets/worksheet*.cpp
+
+# don't commit exam material
+worksheets/exam*
 
 # various makefile generated images
 out.*
